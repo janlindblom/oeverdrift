@@ -58,7 +58,7 @@ void paint(uint32_t pattern[]) {
 }
 
 void setup() {
-  // Setup the ÖVERDRIVEN
+  // Setup the ÖVERDRIFT
   //setup_colours();
   warmerWhite.raw = wew;
   warmWhite.raw = ww;
