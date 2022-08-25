@@ -9,6 +9,8 @@ void setup_colours();
 void set_brightness(uint8_t brightness);
 void decrease_brightness();
 void increase_brightness();
+void key_actions();
+void keyboard_handler();
 
 typedef union {
   uint32_t raw;

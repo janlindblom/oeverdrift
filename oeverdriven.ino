@@ -13,9 +13,9 @@ HSVColour warmWhite;
 HSVColour warmerWhite;
 rgb_colour rgb_warmwhite;
 
-uint32_t pattern_white[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint32_t pattern_warmwhite[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-uint32_t pattern_hotwhite[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint32_t pattern_white[] = {0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847};
+uint32_t pattern_warmwhite[] = {0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433};
+uint32_t pattern_hotwhite[] = {0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847};
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB);
 
@@ -33,7 +33,7 @@ uint32_t w = 0xFFFFFF;
 uint32_t ww_rgb = 0xFDF4DC;
 
 // Our keymap
-uint8_t key_map[] = {KEY_PGDN, KEY_GUI, KEY_PGDN};
+uint8_t key_map[] = {KEY_PGDN, KEY_GUI, KEY_PGUP};
 // Initial states of keys (HIGH since inputs are pulled up)
 uint8_t key_state_previous[] = {HIGH, HIGH, HIGH};
 FIFO key_buf;
@@ -57,9 +57,6 @@ void paint(uint32_t pattern[]) {
   strip.show();
 }
 
-void key_actions();
-void keyboard_handler();
-
 void setup() {
   // Setup the ÖVERDRIVEN
   //setup_colours();
@@ -78,12 +75,12 @@ void setup() {
   while (!Serial);
 
   strip.begin();
-  for (uint8_t i = 0; i < NUM_LEDS; i++) {
-    pattern_hotwhite[i] = wew;
-    //strip.setPixelColor(i, wew);
-    //   EEPROM.write(LED_ADDR + i, hue >> 8);
-    //   EEPROM.write(LED_ADDR + i * 2, hue & 0xFF);
-  }
+  //for (uint8_t i = 0; i < NUM_LEDS; i++) {
+
+  //strip.setPixelColor(i, wew);
+  //   EEPROM.write(LED_ADDR + i, hue >> 8);
+  //   EEPROM.write(LED_ADDR + i * 2, hue & 0xFF);
+  //}
   paint(pattern_hotwhite);
 
   // brightness_level = EEPROM.read(LIGHT_ADDR);
@@ -188,16 +185,18 @@ packchars* pack_message(String str, packchars entries[]) {
 }
 
 void key_actions() {
-  if (key_buf.size() > 0) {
+  while (key_buf.size() > 0) {
     uint8_t key = key_buf.pop();
     if (key == KEY_PGDN) {
       Serial.println("PGDN");
+      decrease_brightness();
     }
     if (key == KEY_GUI) {
       Serial.println("GUI");
     }
     if (key == KEY_PGUP) {
       Serial.println("PGUP");
+      increase_brightness();
     }
   }
 }
@@ -209,17 +208,8 @@ void keyboard_handler() {
   for (uint8_t key = 0; key < sizeof(key_map) / sizeof(key_map[0]); key++) {
     uint8_t state = digitalRead(key_map[key]);
     if ((state != key_state_previous[key]) && (state != HIGH)) {
-      /*
-        String msg = String("Key pressed: 0x" + String(key_map[key], HEX));
-        int packed_length = (int)(msg.length() / 4 + (msg.length() % 4));
-        packchars * packed_msg = (packchars*) malloc(packed_length);
-        for (int i = 0; i < packed_length; i++) {
-        rp2040.fifo.push_nb(packed_msg[i].raw);
-        }
-      */
       Serial.print("Key pressed: 0x");
       Serial.println(key_map[key], HEX);
-
       key_buf.push(key_map[key]);
     }
     key_state_previous[key] = state;
@@ -298,6 +288,8 @@ uint32_t colour(Adafruit_NeoPixel np, HSVColour hsv) {
 
 void set_brightness(uint8_t brightness) {
   // EEPROM.write(LIGHT_ADDR, brightness);
+  Serial.print("Setting brightness level ");
+  Serial.println(brightness, DEC);
   strip.setBrightness(light_level[brightness]);
 }
 
