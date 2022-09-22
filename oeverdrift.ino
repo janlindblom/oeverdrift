@@ -1,36 +1,41 @@
-// Copyright (c) 2022 Jan Lindblom <jan@namnlos.io>
+// Copyright (c) 2022 Jan Lindblom <jan@namnlos.co>
 //
 // This software is released under the MIT License.
 // https://opensource.org/licenses/MIT
 
+#include "FIFO.h"
+#include "oeverdrift.h"
 #include <Adafruit_NeoPixel.h>
 #include <EEPROM.h>
-#include "FIFO.h"
-#include "oeverdriven.h"
 
-HSVColour white;
-HSVColour warmWhite;
-HSVColour warmerWhite;
-rgb_colour rgb_warmwhite;
+uint32_t warmer_white = 0xFF7847;
+uint32_t warm_white = 0xFF785A;
+uint32_t white = 0xFFFFFF;
+uint32_t colors[] = {white, warm_white, warmer_white};
 
-uint32_t pattern_white[] = {0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847};
-uint32_t pattern_warmwhite[] = {0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433, 0xFF7847, 0xFF6433};
-uint32_t pattern_hotwhite[] = {0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847, 0xFF501F, 0xFF7847};
+uint32_t pattern_white[] = {0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847,
+                            0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847,
+                            0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847,
+                            0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847};
+uint32_t pattern_warmwhite[] = {0xFF6433, 0xFF6433, 0xFF6433, 0xFF6433,
+                                0xFF6433, 0xFF6433, 0xFF6433, 0xFF6433,
+                                0xFF6433, 0xFF6433, 0xFF6433, 0xFF6433,
+                                0xFF6433, 0xFF6433, 0xFF6433, 0xFF6433};
+uint32_t pattern_hotwhite[] = {0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F,
+                               0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F,
+                               0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F,
+                               0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F};
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB);
 
-uint8_t sine[] PROGMEM = {4, 3, 2, 1, 0, 11, 10, 9, 8, 7, 6, 5};
-uint32_t led_state[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t sine[] = {4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5};
+uint32_t led_state[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 uint16_t hue = 0;
 uint8_t light_level[] = {0x00, 0x33, 0x66, 0x99, 0xCC, 0xFF};
 
 uint8_t brightness_level = 1;
-
-uint32_t wew = 0xFF7847;
-uint32_t ww = 0xFF785A;
-uint32_t w = 0xFFFFFF;
-uint32_t ww_rgb = 0xFDF4DC;
+uint8_t col = 0;
 
 // Our keymap
 uint8_t key_map[] = {KEY_PGDN, KEY_GUI, KEY_PGUP};
@@ -39,63 +44,36 @@ uint8_t key_state_previous[] = {HIGH, HIGH, HIGH};
 FIFO key_buf;
 
 void paint(uint32_t pattern[]) {
-  if (sizeof(pattern) > sizeof(led_state)) {
-    return;
-  }
-
-  Serial.print("Pattern: [");
   for (uint8_t i = 0; i < sizeof(led_state) / sizeof(led_state[0]); i++) {
     strip.setPixelColor(i, pattern[i]);
     led_state[i] = pattern[i];
-    Serial.print(pattern[i], HEX);
-    if (i + 1 < sizeof(led_state) / sizeof(led_state[0])) {
-      Serial.print(", ");
-    }
   }
-  Serial.println("]");
 
   strip.show();
 }
 
 void setup() {
   // Setup the ÖVERDRIFT
-  //setup_colours();
-  warmerWhite.raw = wew;
-  warmWhite.raw = ww;
-  white.raw = w;
-  rgb_warmwhite.raw = ww_rgb;
   EEPROM.begin(512);
 
   for (uint8_t key = 0; key < sizeof(key_map) / sizeof(key_map[0]); key++) {
     pinMode(key_map[key], INPUT_PULLUP);
   }
-  delay(200);
-
-  Serial.begin(9600);
-  while (!Serial);
+  delay(100);
 
   strip.begin();
-  //for (uint8_t i = 0; i < NUM_LEDS; i++) {
+  // for (uint8_t i = 0; i < NUM_LEDS; i++) {
 
-  //strip.setPixelColor(i, wew);
-  //   EEPROM.write(LED_ADDR + i, hue >> 8);
-  //   EEPROM.write(LED_ADDR + i * 2, hue & 0xFF);
-  //}
+  // strip.setPixelColor(i, wew);
+  //    EEPROM.write(LED_ADDR + i, hue >> 8);
+  //    EEPROM.write(LED_ADDR + i * 2, hue & 0xFF);
+  // }
   paint(pattern_hotwhite);
 
   // brightness_level = EEPROM.read(LIGHT_ADDR);
   strip.setBrightness(light_level[brightness_level]);
 
-  //Keyboard.begin();
-
-  Serial.print("Warmer White: 0x");
-  Serial.println(wew, HEX);
-  Serial.print("Warm White: 0x");
-  Serial.println(ww, HEX);
-  Serial.print("White: 0x");
-  Serial.println(w, HEX);
-  Serial.print("Warm White (RGB): 0x");
-  Serial.println(ww_rgb, HEX);
+  // Keyboard.begin();
 }
 
 void loop() {
@@ -139,6 +117,21 @@ void loop() {
   */
 }
 
+void loop1() {
+  delay(1000);
+  if (col == 0) {
+    paint(pattern_white);
+  } else if (col == 1) {
+    paint(pattern_warmwhite);
+  } else if (col == 2) {
+    paint(pattern_hotwhite);
+  }
+  col++;
+  if (col > 2) {
+    col = 0;
+  }
+}
+
 packchars pack_string(String str) {
   packchars entry;
   entry.raw = 0;
@@ -158,11 +151,11 @@ packchars pack_string(String str) {
   return entry;
 }
 
-packchars* pack_message(String str, packchars entries[]) {
+packchars *pack_message(String str, packchars entries[]) {
   unsigned int len = str.length();
   char str_chars[len];
   str.toCharArray(str_chars, len);
-  //packchars entries[(unsigned int)(len / 4 + (len % 4))];
+  // packchars entries[(unsigned int)(len / 4 + (len % 4))];
 
   uint8_t chars = 4;
   unsigned int packed_index = 0;
@@ -188,14 +181,12 @@ void key_actions() {
   while (key_buf.size() > 0) {
     uint8_t key = key_buf.pop();
     if (key == KEY_PGDN) {
-      Serial.println("PGDN");
       decrease_brightness();
     }
     if (key == KEY_GUI) {
-      Serial.println("GUI");
+      // Toggle on/off
     }
     if (key == KEY_PGUP) {
-      Serial.println("PGUP");
       increase_brightness();
     }
   }
@@ -208,88 +199,14 @@ void keyboard_handler() {
   for (uint8_t key = 0; key < sizeof(key_map) / sizeof(key_map[0]); key++) {
     uint8_t state = digitalRead(key_map[key]);
     if ((state != key_state_previous[key]) && (state != HIGH)) {
-      Serial.print("Key pressed: 0x");
-      Serial.println(key_map[key], HEX);
       key_buf.push(key_map[key]);
     }
     key_state_previous[key] = state;
   }
 }
 
-void setup_colours() {
-  white.raw = 0;
-  warmWhite.raw = 0;
-  warmerWhite.raw = 0;
-
-  white.hue = 0;
-  warmWhite.hue = 2002;
-  warmerWhite.hue = 2912;
-
-  white.sat = 0;
-  warmWhite.sat = 165;
-  warmerWhite.sat = 184;
-
-  white.val = 255;
-  warmWhite.val = 255;
-  warmerWhite.val = 255;
-}
-
-int sort_desc(const void *cmp1, const void *cmp2) {
-  double_t a = *((double *)cmp1);
-  double_t b = *((double *)cmp2);
-  // The comparison
-  return a > b ? -1 : (a < b ? 1 : 0);
-}
-
-HSVColour create_hsv_colour(uint16_t h, uint8_t s, uint8_t v) {
-  HSVColour shade;
-  shade.raw = 0;
-  shade.hue = h;
-  shade.sat = s;
-  shade.val = v;
-  return shade;
-}
-
-HSVColour rgb_to_hsv(uint8_t r, uint8_t g, uint8_t b) {
-  double_t rd = ((double_t)r) / 255;
-  double_t gd = ((double_t)g) / 255;
-  double_t bd = ((double_t)b) / 255;
-  double_t rgbd[] = {rd, gd, bd};
-  qsort(rgbd, sizeof(rgbd) / sizeof(rgbd[0]), sizeof(rgbd[0]), sort_desc);
-  double_t c_max = rgbd[0];
-  double_t c_min = rgbd[2];
-  double_t delta = c_max - c_min;
-  uint8_t saturation = c_max != 0 ? (uint8_t)(255 * (delta / c_max)) : 0;
-  uint8_t value = (uint8_t)(c_max * 255);
-  double_t h = 0;
-
-  if (rd == c_max) {
-    h = (gd - bd) / delta;
-    h = (int16_t)h % 6;
-  } else if (gd == c_max) {
-    h = (bd - rd) / delta;
-    h += 2;
-  } else if (bd == c_max) {
-    h = (rd - gd) / delta;
-    h += 4;
-  }
-  h *= 60;
-  if (h < 0) {
-    h += 360;
-  }
-  h = (65536 / 360) * h;
-
-  return create_hsv_colour((uint16_t)h, saturation, value);
-}
-
-uint32_t colour(Adafruit_NeoPixel np, HSVColour hsv) {
-  return np.ColorHSV(hsv.hue, hsv.sat, hsv.val);
-}
-
 void set_brightness(uint8_t brightness) {
   // EEPROM.write(LIGHT_ADDR, brightness);
-  Serial.print("Setting brightness level ");
-  Serial.println(brightness, DEC);
   strip.setBrightness(light_level[brightness]);
 }
 
