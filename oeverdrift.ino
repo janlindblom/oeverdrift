@@ -11,7 +11,12 @@
 uint32_t warmer_white = 0xFF7847;
 uint32_t warm_white = 0xFF785A;
 uint32_t white = 0xFFFFFF;
-uint32_t colors[] = {white, warm_white, warmer_white};
+
+enum modes { WHITE, WARM, HOT };
+
+enum mode_style { STATIC, DYNAMIC };
+
+uint8_t mode = WHITE;
 
 uint32_t pattern_white[] = {0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847,
                             0xFF7847, 0xFF7847, 0xFF7847, 0xFF7847,
@@ -26,6 +31,9 @@ uint32_t pattern_hotwhite[] = {0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F,
                                0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F,
                                0xFF501F, 0xFF501F, 0xFF501F, 0xFF501F};
 
+// uint32_t (*)[] modes[] = {, &pattern_warmwhite, &pattern_hotwhite};
+uint8_t mode_styles[] = {STATIC, STATIC, STATIC};
+
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, LED_PIN, NEO_GRB);
 
 uint8_t sine[] = {4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5};
@@ -38,7 +46,7 @@ uint8_t brightness_level = 1;
 uint8_t col = 0;
 
 // Our keymap
-uint8_t key_map[] = {KEY_PGDN, KEY_GUI, KEY_PGUP};
+uint8_t key_map[] = {KEY_LEVEL, KEY_ONOFF, KEY_MODE};
 // Initial states of keys (HIGH since inputs are pulled up)
 uint8_t key_state_previous[] = {HIGH, HIGH, HIGH};
 FIFO key_buf;
@@ -57,7 +65,7 @@ void setup() {
   EEPROM.begin(512);
 
   for (uint8_t key = 0; key < sizeof(key_map) / sizeof(key_map[0]); key++) {
-    pinMode(key_map[key], INPUT_PULLUP);
+    pinMode(key_map[key], PinMode::INPUT_PULLUP);
   }
   delay(100);
 
@@ -70,124 +78,34 @@ void setup() {
   // }
   paint(pattern_hotwhite);
 
-  // brightness_level = EEPROM.read(LIGHT_ADDR);
+  brightness_level = EEPROM.read(LIGHT_ADDR);
   strip.setBrightness(light_level[brightness_level]);
 
   // Keyboard.begin();
+  if (!Serial) {
+    Serial.begin(9600);
+  }
 }
 
 void loop() {
-  // uint32_t color = strip.ColorHSV(hue, 33, 252);
-  // for (uint8_t i = 0; i < NUM_LEDS; i++) {
-  // if (hue >= 65407) {
-  //   hue = 0;
-  // }
-  //  delay(100);
-  //  strip.setPixelColor(sine[i], color);
-  //   EEPROM.update(LED_ADDR + i, hue >> 8);
-  //   EEPROM.update(LED_ADDR + i * 2, hue & 0xFF);
-  //  hue += 128;
-  //}
-
-  // strip.fill(color);
-  // strip.show();
-  // EEPROM.commit();
-
   keyboard_handler();
   key_actions();
-  /*
-    if (digitalRead(KEY_PGDN) != HIGH) {
-    Serial.println("PGDN");
-    decrease_brightness();
-    }
-
-    if (digitalRead(KEY_GUI) != HIGH) {
-    Serial.println("GUI");
-    if (strip.getBrightness() != 0) {
-      set_brightness(0);
-    } else {
-      set_brightness(brightness_level);
-    }
-    }
-
-    if (digitalRead(KEY_PGUP) != HIGH) {
-    Serial.println("PGUP");
-    increase_brightness();
-    }
-  */
-}
-
-void loop1() {
-  delay(1000);
-  if (col == 0) {
-    paint(pattern_white);
-  } else if (col == 1) {
-    paint(pattern_warmwhite);
-  } else if (col == 2) {
-    paint(pattern_hotwhite);
-  }
-  col++;
-  if (col > 2) {
-    col = 0;
-  }
-}
-
-packchars pack_string(String str) {
-  packchars entry;
-  entry.raw = 0;
-  int len = str.length();
-  char str_chars[len];
-  str.toCharArray(str_chars, len);
-  entry.char1 = str_chars[0];
-  if (len > 1) {
-    entry.char2 = str_chars[1];
-    if (len > 2) {
-      entry.char3 = str_chars[2];
-      if (len > 3) {
-        entry.char4 = str_chars[3];
-      }
-    }
-  }
-  return entry;
-}
-
-packchars *pack_message(String str, packchars entries[]) {
-  unsigned int len = str.length();
-  char str_chars[len];
-  str.toCharArray(str_chars, len);
-  // packchars entries[(unsigned int)(len / 4 + (len % 4))];
-
-  uint8_t chars = 4;
-  unsigned int packed_index = 0;
-  char char_word[4];
-
-  for (int i = 0; i < len; i++) {
-    if ((chars < 1) || (i == len - 1)) {
-      chars = 4;
-      packchars entry = pack_string(char_word);
-      entries[packed_index] = entry;
-      for (uint8_t c = 0; c < 4; c++) {
-        char_word[c] = 0;
-      }
-      packed_index++;
-    }
-    char_word[4 - chars] = str_chars[i];
-    chars--;
-  }
-  return entries;
 }
 
 void key_actions() {
   while (key_buf.size() > 0) {
     uint8_t key = key_buf.pop();
-    if (key == KEY_PGDN) {
-      decrease_brightness();
-    }
-    if (key == KEY_GUI) {
-      // Toggle on/off
-    }
-    if (key == KEY_PGUP) {
+    if (key == KEY_LEVEL) {
       increase_brightness();
+    }
+    if (key == KEY_ONOFF) {
+      if (brightness_level != 0) {
+        set_brightness(0);
+      } else {
+        set_brightness(brightness_level);
+      }
+    }
+    if (key == KEY_MODE) {
     }
   }
 }
@@ -198,16 +116,25 @@ void key_actions() {
 void keyboard_handler() {
   for (uint8_t key = 0; key < sizeof(key_map) / sizeof(key_map[0]); key++) {
     uint8_t state = digitalRead(key_map[key]);
+
     if ((state != key_state_previous[key]) && (state != HIGH)) {
       key_buf.push(key_map[key]);
+      if (Serial) {
+        Serial.print("Key ");
+        Serial.print(key_map[key], DEC);
+        Serial.print(" state: ");
+        Serial.println(state, DEC);
+        Serial.println("Registering keypress.");
+      }
     }
     key_state_previous[key] = state;
   }
 }
 
 void set_brightness(uint8_t brightness) {
-  // EEPROM.write(LIGHT_ADDR, brightness);
+  EEPROM.write(LIGHT_ADDR, brightness);
   strip.setBrightness(light_level[brightness]);
+  EEPROM.commit();
 }
 
 void decrease_brightness() {
@@ -221,7 +148,7 @@ void decrease_brightness() {
 
 void increase_brightness() {
   if (brightness_level > 3) {
-    brightness_level = 4;
+    brightness_level = 1;
   } else {
     brightness_level++;
   }
